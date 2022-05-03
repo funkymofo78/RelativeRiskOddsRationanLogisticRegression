@@ -1,0 +1,249 @@
+mydata <- read.csv("UCLA_admissions.csv", TRUE, ",")
+
+View(mydata)
+str(mydata)
+
+```
+
+mydata<-read.csv("UCLA_admissions.csv")
+
+```{R}
+
+head(mydata)
+str(mydata)
+mydata$rank <- as.factor(mydata$rank)
+mydata$admit <- factor(mydata$admit,
+                       labels=c("No","Yes"))
+help("as.factor")
+str(mydata)
+```
+
+```{R}
+#pairs(mydata)
+
+#What is  the response variable and the research question of interest in this dataset?
+#response variable is admission as want to know what influnces getting
+#accepted into UCLA postgraduate courses
+dev.off()
+
+#Investigate if any of the variables have a relationship with the response variable by producing appropriate plots or tables.
+
+plot(gre~gpa,mydata,col=admit,pch=16)
+legend("bottomright",c("No admission","Admitted"),fill=mydata$admit)
+#weak linear relationship
+
+dev()
+boxplot(gre~admit,data=mydata,ylab="GRE",col=c(0,2))
+#seems to be slightly higher GRE for admissions
+
+
+boxplot(gpa~admit,data=mydata,ylab="GPA")
+#seems to be slightly higher GPA for admissions
+
+boxplot(gre~rank,data=mydata,ylab="GRE")
+#slight higher for higher ranks
+boxplot(gpa~rank,data=mydata,ylab="GPA")
+#not as obvious but rank 1 has slightly higher GPA
+boxplot(gre~sex,data=mydata,ylab="GRE")
+boxplot(gpa~sex,data=mydata,ylab="GPA")
+#none for GPA not much for GRE
+
+rank_admit<-table(mydata$rank,mydata$admit)
+prop.table(rank_admit,1)
+rank_admit
+#unbalance higher rank more likely to get admitted
+sex_admit<-table(mydata$sex,mydata$admit)
+addmargins(sex_admit)
+prop.table(sex_admit,1)
+sex_admit
+#slightly higher prop of females admitted, not sure if
+#a big enough difference
+sex_rank<-table(mydata$sex,mydata$rank)
+addmargins(sex_rank)
+prop.table(sex_rank,2)
+#more balanced
+```
+
+
+#Calculate the relative risk and odds ratio between Admit and Sex. Interpret these results. (Use epitools package with epitab command). Are Admission and gender independent of each other?
+
+```{R}
+#RR 
+(138/212) / (135/188)
+#estimate of risk of no admin for females
+#compared to males is 0.2315397
+#install.packages("epitools")
+library(epitools)
+help(epitab)
+epitab(sex_admit,method="riskratio",rev="both")
+#est. relative risk of not getting admitted to UCLA 
+#is 0.907 for females
+#compared to males
+#H0: True RR =1 (prop for no admission for males and females
+#are equal, i.e. no relationship sex and admission)
+#H1: RR!=1  (i.e. relationship sex and admission)
+#p-value = 0.1626785 >0.05, therefore we fail to reject 
+#Ho, the probability of not admitted is same for
+#males and females, no evidence to suggest relationship
+#between sex and admission
+```
+
+#Create a 3-way contingency table for Admit, Sex and Rank. Calculate the common odds ratio across rank level and test to see if Admission and gender  #are conditional independent of each other.
+```{R}
+#Odds ratio
+
+#0.7321321 estimate odds for no survival for females
+#compared to no survival for males
+
+epitab(sex_admit,method="oddsratio",rev="both")
+#est. odds of not getting admitted to UCLA is 0.732 for females
+#compared to males
+#Ho: True Odds Ratio = 1
+#H1: True Odds Ratio != 1
+#p-value =0.1626785, so fail to reject, no sig. dif
+#of admission for males and females.
+###same test as above
+prop.test(sex_admit)
+chisq.test(sex_admit)
+#pvalue>0.05 so no significiant difference between males and females
+
+table3 = table(mydata$sex,mydata$admit,mydata$rank)
+#what you are conditioning on should be the third item
+table3
+ftable(table3)                     
+# Display a flattened table
+(15*12)/(13*21)
+#odds ratio<1 for rank
+(33*8)/(22*4)
+#odds ratio =3 for rank 4
+
+#Ho: True Common odds ratio =1
+#i.e testing admission and gender are conditional 
+#idependent of rank
+#H1: True Common odds ratio !=1
+#i.e coditional dependent
+help(mantelhaen.test)
+mantelhaen.test(table3)
+#p-value=0.1911 >0.05, fail to reject h0; no evidence to suggest
+#admission and gender conditional dependent
+#check each partial odds ratio is roughly the same
+(15*12)/(21*13)
+(45*25)/(52*29)
+(45*8)/(20*48)
+(33*8)/(22*4)
+
+```
+
+#Construct an appropriate logistic regression to predict Admit. (Use glm() with family= binomial). Interpret results
+#Are there any variables you would like to remove from the model run in previous part. Rerun the reduce logistic regression model and interpret output.
+#Compare this model with the previous model in previous part 
+
+```{R}
+#assumption not reasonable here
+
+#running full model even did not see a relationship
+# with admission and sex wouldn't do this in practice
+logit1 <- glm(admit ~ gre+gpa+rank+sex,data=mydata,
+              family="binomial")
+
+summary(logit1)
+-3.859208+0.002355*(300)+0.790029*(3)-0.648061*(1)-0.331791*(1)
+exp(-1.762473)#est. success odds at GRE 300, GPA 3 with rank 2 uni and male
+exp(-1.762473)/(1+exp(-1.762473))
+#logit(pi)=log(success odd of non admission)=
+#  -3.859208+0.002355gre+0.790029gpa-0.648061rank2
+#  -1.325416rank3-1.550760rank4-0.331791sexMale
+exp(-3.859208)
+#est success odds for admission 0.02108469 for a female
+# from uni with rank 1 with 0 gre and 0 gpa
+exp(0.002355)
+#est success odds for admission change by factor of
+#1.002358 for a 1 unit increase in gre for a female/male
+# from uni with the same rank with the same gpa
+exp(0.790029)
+#est success odds for admission change by factor of
+#2.20346 for a 1 unit increase in gpa for a female/male
+# from uni with the same rank with the same gre
+exp(-0.648061)
+#est success odds for admission change by factor of
+#0.523059 when you change from rank 1 to rank 2 for
+#a female/male student with the same gre and gpa
+exp(-1.325416)
+exp(-1.550760)
+exp(-0.331791)
+#est  success odds for admission change by a factor
+#0.7176373 when you compare a female to a male student
+#from the same rank univeristy with  same gre and gpa
+#anova(logit1,test="Chisq")
+#not balanced design
+library(car)
+Anova(logit1,type="2")
+pchisq((499.98-456.42),399-393,lower.tail = F)
+#ho:saturated model (null model) is preferred
+#h1: logit1 model is preferred
+#p-value= 9.036073e-08<0.05, reject null
+```
+
+```{R}
+vif(logit1)
+#vif values all close to 1 no need to worry about 
+#multicol. assumption
+
+logit2 <- glm(admit ~ gre+gpa+rank,data=mydata,family="binomial")
+
+summary(logit2)
+vif(logit2)
+
+#anova(logit2,test="Chisq")
+Anova(logit2,type="2")
+#comparison 
+summary(logit1)
+summary(logit2)
+BIC(logit1,logit2)
+#AIC is lower for model 1 slightly ut BIC is prefer model
+#with BIC
+#LRT
+anova(logit1,logit2,test="Chisq")
+anova(logit2,logit1,test="Chisq")
+
+#Ho: reduced model is preferred, 
+#(i.e. no need to include sex)
+#H1: fuller model is preferred, 
+#(i.e. include sex)
+#p-value = 0.1471>0.05, fail to reject null and 
+#the reduced model is preferred.
+
+#CMH test no evidence to suggest to run this model
+#but assumptions not met so possible effect potentially
+logit3 <- glm(admit ~ gre+gpa+rank+sex:rank,data=mydata,family="binomial")
+summary(logit3)
+vif(logit3)
+
+Anova(logit3,type="2")
+#interaction term is significant 
+anova(logit2,logit3,test="Chisq")
+#interaction term is significant using Likelihood ratio
+#test 
+AIC(logit2,logit3)
+BIC(logit2,logit3)
+
+#AIC has decreased suggested this model is preferred
+#but BIC is smaller for model 2
+#LRT and AIC in favour of model with interaction
+#BIC is in favour model without 
+
+#equation for female students success odds of admission (pi_female):
+#logit(pi_female)=-4.249017+0.002373gre+0.870745gpa-
+#  0.516204rank2-0.921364rank3-2.193550rank4
+
+#equation for male students success odds of admission (pi_male):
+#logit(pi_male)= (-4.249017-0.089566) + 0.002373(gre) + 0.870745(gpa) -
+#  0.388613(rank2) - 1.131797(rank3) + 1.158158(rank4)
+
+odds = logit3$fitted.values / (1-logit3$fitted.values)
+log_odds <- log(odds)
+par(mfrow=c(2,2))
+plot(log_odds~mydata$gre)
+plot(log_odds~mydata$gpa)
+plot(log_odds~mydata$rank)
+```
